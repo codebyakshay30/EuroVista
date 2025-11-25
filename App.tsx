@@ -587,7 +587,7 @@ const PlannerView: React.FC = () => {
 
   if (plan) {
     return (
-      <div className="p-6 pb-28 animate-slide-up">
+      <div className="p-6 pb-28 pt-12 animate-slide-up">
         <div className="flex justify-between items-center mb-6 mt-4">
           <SectionTitle>Your Itinerary</SectionTitle>
           <button onClick={() => setPlan(null)} className="text-sm text-indigo-300 underline font-medium">Start Over</button>
@@ -629,7 +629,7 @@ const PlannerView: React.FC = () => {
   }
 
   return (
-    <div className="p-6 pb-28 animate-slide-up mt-4">
+    <div className="p-6 pb-28 pt-12 animate-slide-up mt-4">
       <h2 className="text-3xl font-bold mb-2">Trip Planner</h2>
       <p className="text-white/60 mb-8">AI-curated plans tailored to your style.</p>
 
@@ -693,13 +693,18 @@ const BudgetView: React.FC = () => {
     
     const calculate = async () => {
         setLoading(true);
-        const res = await calculateBudget(formData.dest, formData.days, formData.style);
-        setResult(res);
-        setLoading(false);
+        try {
+            const res = await calculateBudget(formData.dest, formData.days, formData.style);
+            setResult(res);
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
-        <div className="p-6 pb-28 animate-slide-up mt-4">
+        <div className="p-6 pb-28 pt-12 animate-slide-up mt-4">
             <h2 className="text-3xl font-bold mb-6">Budget Calc</h2>
             {!result ? (
                 <div className="space-y-6">
