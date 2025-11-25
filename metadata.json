@@ -1,0 +1,7 @@
+{
+  "name": "EUROVISTA",
+  "description": "A premium, AI-powered Europe travel guide featuring smart planning, live weather, and budgeting tools.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
