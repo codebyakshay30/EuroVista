@@ -86,6 +86,15 @@
 </script>
 </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+        <!-- Initial Loading State to prevent blank screen before JS loads -->
+        <div style="height: 100vh; display: flex; align-items: center; justify-content: center; font-family: 'Outfit', sans-serif; font-size: 1.5rem; font-weight: 600; color: rgba(255,255,255,0.7); animation: pulse 2s infinite;">
+            EUROVISTA...
+        </div>
+        <style>
+            @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+        </style>
+    </div>
+    <script type="module" src="./index.tsx"></script>
   </body>
 </html>
