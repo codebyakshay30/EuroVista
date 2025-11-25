@@ -3,80 +3,171 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   MapPin, Cloud, Sun, Info, Calendar, DollarSign, Languages, 
   Heart, Home, ArrowRight, User, Plane, Check, Volume2, Search, ArrowLeft, Loader2,
-  Mic, Camera, Shirt, Watch, Ticket, X, CreditCard, Building2, ExternalLink, QrCode, ShoppingBag
+  Mic, Camera, Shirt, Watch, Ticket, X, CreditCard, Building2, ExternalLink, QrCode, ShoppingBag, Compass
 } from 'lucide-react';
 import { getLiveCityData, generateTripPlan, calculateBudget, translatePhrase } from './services/geminiService';
 import { fetchCityImage } from './services/wikiService';
 import { CityDetails, TripPlan, BudgetResult, AppView, POPULAR_CITIES, ItineraryItem, Attraction } from './types';
 import { GlassCard, SectionTitle, LoadingScreen, Button } from './components/Components';
 
+// --- HELPER FOR IMAGES ---
+const getCityVibeImage = (city: string, type: 'street' | 'food' | 'night'): string => {
+  const cityLower = city.toLowerCase();
+  
+  const map: Record<string, Record<string, string>> = {
+    paris: {
+      street: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?q=80&w=400",
+      food: "https://images.unsplash.com/photo-1550966871-3ed3c47e2ce2?q=80&w=400",
+      night: "https://images.unsplash.com/photo-1492136344046-866c85e0bf04?q=80&w=400"
+    },
+    rome: {
+      street: "https://images.unsplash.com/photo-1552832230-c0197dd311b5?q=80&w=400",
+      food: "https://images.unsplash.com/photo-1551892374-ecf8754cf8b0?q=80&w=400",
+      night: "https://images.unsplash.com/photo-1525874684015-58379d421a52?q=80&w=400"
+    },
+    london: {
+      street: "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?q=80&w=400",
+      food: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=400",
+      night: "https://images.unsplash.com/photo-1529655683826-aba9b3e77383?q=80&w=400"
+    },
+    santorini: {
+      street: "https://images.unsplash.com/photo-1613395877344-13d4c79e4df1?q=80&w=400",
+      food: "https://images.unsplash.com/photo-1533038590840-1cde6e668a91?q=80&w=400",
+      night: "https://images.unsplash.com/photo-1570077188670-e3a8d69ac5ff?q=80&w=400"
+    },
+    barcelona: {
+      street: "https://images.unsplash.com/photo-1539037116277-4db20889f2d4?q=80&w=400",
+      food: "https://images.unsplash.com/photo-1543340020-de31b9d0a697?q=80&w=400",
+      night: "https://images.unsplash.com/photo-1506190696956-628d0901e712?q=80&w=400"
+    },
+    amsterdam: {
+      street: "https://images.unsplash.com/photo-1512470876302-687da745313d?q=80&w=400",
+      food: "https://images.unsplash.com/photo-1455619452474-d2be8b1e70cd?q=80&w=400",
+      night: "https://images.unsplash.com/photo-1563299796-b729d0af54a5?q=80&w=400"
+    },
+    prague: {
+      street: "https://images.unsplash.com/photo-1519677100203-a0e668c92439?q=80&w=400",
+      food: "https://images.unsplash.com/photo-1559339352-11d035aa65de?q=80&w=400",
+      night: "https://images.unsplash.com/photo-1505761671935-60b3a7427bad?q=80&w=400"
+    },
+    "swiss alps": {
+      street: "https://images.unsplash.com/photo-1531366936337-7c912a4589a7?q=80&w=400",
+      food: "https://images.unsplash.com/photo-1625244515860-2646c2436ce0?q=80&w=400",
+      night: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?q=80&w=400"
+    }
+  };
+
+  const defaults = {
+    street: "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?q=80&w=400",
+    food: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=400",
+    night: "https://images.unsplash.com/photo-1519114056088-b877cb013621?q=80&w=400"
+  };
+
+  // Fuzzy match or default
+  const key = Object.keys(map).find(k => cityLower.includes(k));
+  return key ? map[key][type] : defaults[type];
+};
+
 // --- SUB-COMPONENTS ---
 
-const SplashScreen: React.FC<{ onStart: () => void }> = ({ onStart }) => (
-  <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden p-6 text-center">
-    {/* Cinematic Background */}
-    <div className="absolute inset-0 z-0">
-        <img 
-            src="https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?q=80&w=1200&auto=format&fit=crop" 
-            alt="Swiss Alps Travel" 
-            className="w-full h-full object-cover opacity-30 scale-105 animate-float"
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-indigo-950 via-indigo-900/90 to-indigo-950"></div>
-    </div>
+const SplashScreen: React.FC<{ onStart: () => void }> = ({ onStart }) => {
+  // Centralized collage images configuration
+  // Using direct Unsplash IDs to ensure they load
+  const collageImages = [
+    { src: "https://images.unsplash.com/photo-1499856871940-a09627c6dcf6?q=80&w=600", style: "rotate-[-6deg] -translate-x-24 -translate-y-32 md:-translate-x-32 md:-translate-y-40", z: "z-10" },
+    { src: "https://images.unsplash.com/photo-1613395877344-13d4c79e4df1?q=80&w=600", style: "rotate-[8deg] translate-x-24 -translate-y-28 md:translate-x-32 md:-translate-y-36", z: "z-20" },
+    { src: "https://images.unsplash.com/photo-1552832230-c0197dd311b5?q=80&w=600", style: "rotate-[-10deg] -translate-x-32 translate-y-24 md:-translate-x-40 md:translate-y-32", z: "z-30" },
+    { src: "https://images.unsplash.com/photo-1531366936337-7c912a4589a7?q=80&w=600", style: "rotate-[5deg] translate-x-32 translate-y-20 md:translate-x-36 md:translate-y-28", z: "z-10" },
+    { src: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=600", style: "rotate-[-3deg] translate-x-0 -translate-y-40 scale-90 opacity-80", z: "z-0" },
+  ];
 
-    {/* Background Elements */}
-    <div className="absolute top-10 left-10 w-32 h-32 bg-purple-500/20 rounded-full blur-3xl animate-pulse z-10"></div>
-    <div className="absolute bottom-10 right-10 w-40 h-40 bg-blue-500/20 rounded-full blur-3xl animate-pulse delay-700 z-10"></div>
-    
-    {/* 3D Character & Floating Pictures */}
-    <div className="relative w-72 h-72 mb-10 z-20">
-      <div className="absolute inset-0 bg-gradient-to-tr from-orange-400/30 to-purple-500/30 rounded-full blur-2xl animate-pulse"></div>
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden bg-[#0F172A]">
+      {/* Background Gradient & Texture */}
+      <div className="absolute inset-0 bg-gradient-to-br from-indigo-950 via-purple-950 to-slate-950"></div>
+      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-10"></div>
       
-      {/* Main Character */}
-      <img 
-        src="https://cdn3d.iconscout.com/3d/premium/thumb/traveler-5736768-4819777.png?f=webp" 
-        onError={(e) => {
-            (e.target as HTMLImageElement).src = "https://cdn3d.iconscout.com/3d/premium/thumb/travel-bag-3d-icon-download-in-png-blend-fbx-gltf-file-formats--luggage-vacation-summer-pack-holidays-icons-5431682.png"
-        }}
-        alt="Travel Character" 
-        className="w-full h-full object-contain relative z-10 drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-float"
-      />
+      {/* Ambient Lights/Bokeh */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-500/20 rounded-full blur-[120px] animate-pulse"></div>
+      <div className="absolute top-0 right-0 w-96 h-96 bg-purple-500/20 rounded-full blur-[100px]"></div>
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-500/20 rounded-full blur-[100px]"></div>
 
-      {/* Floating Polaroid: Paris */}
-      <div className="absolute top-0 right-0 w-20 h-24 bg-white p-1 shadow-lg transform rotate-12 animate-float" style={{ animationDelay: '1.5s' }}>
-          <img src="https://images.unsplash.com/photo-1499856871940-a09627c6dcf6?q=80&w=200" className="w-full h-16 object-cover mb-1 bg-gray-200" alt="Paris" />
-          <div className="h-1 bg-gray-100 rounded-full w-12 mx-auto"></div>
+      {/* Central Collage Container */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none perspective-[1000px]">
+          {collageImages.map((img, i) => (
+              <div 
+                  key={i} 
+                  className={`absolute w-40 h-52 md:w-52 md:h-64 bg-white p-2 pb-8 shadow-2xl rounded transform transition-all duration-1000 ease-out opacity-0 animate-fade-in ${img.style} ${img.z} hover:scale-110 hover:z-50 hover:rotate-0`}
+                  style={{ 
+                      animationDelay: `${i * 0.15}s`,
+                      animationFillMode: 'forwards',
+                      transformStyle: 'preserve-3d'
+                  }}
+              >
+                  <img 
+                    src={img.src} 
+                    alt="Travel Memory" 
+                    className="w-full h-full object-cover filter brightness-95 hover:brightness-110 transition-all rounded-sm"
+                    onLoad={(e) => (e.target as HTMLImageElement).parentElement?.classList.remove('opacity-0')} 
+                  />
+                  {/* Glossy overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-transparent opacity-50 pointer-events-none"></div>
+                  {/* Pin/Tape Effect */}
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-24 h-6 bg-yellow-100/30 backdrop-blur-sm -rotate-2 border border-white/20 shadow-sm"></div>
+              </div>
+          ))}
       </div>
 
-       {/* Floating Polaroid: Rome */}
-      <div className="absolute bottom-4 left-0 w-20 h-24 bg-white p-1 shadow-lg transform -rotate-12 animate-float" style={{ animationDelay: '2.5s' }}>
-          <img src="https://images.unsplash.com/photo-1552832230-c0197dd311b5?q=80&w=200" className="w-full h-16 object-cover mb-1 bg-gray-200" alt="Rome" />
-          <div className="h-1 bg-gray-100 rounded-full w-12 mx-auto"></div>
-      </div>
+      {/* Overlay to ensure text readability */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"></div>
+      <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-slate-900/50"></div>
 
-       {/* Floating Polaroid: London */}
-      <div className="absolute top-10 -left-4 w-16 h-20 bg-white p-1 shadow-lg transform -rotate-6 animate-float" style={{ animationDelay: '0.5s' }}>
-          <img src="https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?q=80&w=200" className="w-full h-12 object-cover mb-1 bg-gray-200" alt="London" />
-          <div className="h-1 bg-gray-100 rounded-full w-8 mx-auto"></div>
-      </div>
+      {/* Main Content */}
+      <div className="relative z-50 flex flex-col items-center text-center px-6 mt-12 animate-slide-up">
+        
+        {/* Glowing Logo Icon */}
+        <div className="mb-8 relative group cursor-pointer">
+             <div className="absolute inset-0 bg-indigo-500 blur-2xl opacity-40 group-hover:opacity-60 transition-opacity animate-pulse"></div>
+             <div className="w-24 h-24 bg-gradient-to-tr from-orange-400 to-pink-600 rounded-[2rem] rotate-12 flex items-center justify-center shadow-2xl shadow-orange-500/40 relative z-10 border border-white/20 group-hover:rotate-[24deg] transition-transform duration-500">
+                 <Compass size={48} className="text-white -rotate-12 group-hover:-rotate-[24deg] transition-transform duration-500" strokeWidth={2}/>
+             </div>
+        </div>
 
-      {/* Floating Icons */}
-      <div className="absolute -top-6 left-1/2 bg-white/10 backdrop-blur-md p-3 rounded-full animate-bounce border border-white/20 shadow-lg">✈️</div>
-      <div className="absolute bottom-0 right-8 bg-white/10 backdrop-blur-md p-3 rounded-full animate-bounce delay-300 border border-white/20 shadow-lg">📸</div>
+        <h1 className="text-6xl md:text-9xl font-black text-white tracking-tighter drop-shadow-2xl mb-4 relative">
+           EURO
+           <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-pink-300 to-purple-300">VISTA</span>
+        </h1>
+
+        <p className="text-lg md:text-2xl text-blue-100/90 font-light tracking-wide mb-12 max-w-xl leading-relaxed drop-shadow-md">
+           Unlock the magic of Europe. <br/>
+           <span className="text-white/60 text-base">Smart Plans • Live Vibes • Local Secrets</span>
+        </p>
+
+        <button 
+          onClick={onStart}
+          className="group relative px-10 py-5 bg-white text-indigo-950 rounded-full font-bold text-lg shadow-[0_0_50px_rgba(255,255,255,0.2)] hover:shadow-[0_0_80px_rgba(255,255,255,0.4)] transition-all duration-300 transform hover:-translate-y-1 active:scale-95 overflow-hidden"
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-indigo-100 via-white to-blue-100 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+          <span className="relative z-10 flex items-center gap-3">
+             Start Exploring <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform"/>
+          </span>
+        </button>
+
+        <div className="mt-16 flex flex-wrap justify-center gap-6 opacity-60 text-[10px] md:text-xs tracking-[0.2em] uppercase font-bold text-white">
+            <span className="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-full backdrop-blur-sm border border-white/5">
+                <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div> Real-time Weather
+            </span>
+            <span className="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-full backdrop-blur-sm border border-white/5">
+                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse delay-75"></div> AI Planning
+            </span>
+            <span className="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-full backdrop-blur-sm border border-white/5">
+                <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-pulse delay-150"></div> Instant Translation
+            </span>
+        </div>
+      </div>
     </div>
-
-    <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-blue-100 to-indigo-200 mb-4 tracking-tighter relative z-20 drop-shadow-sm">
-      EUROVISTA
-    </h1>
-    <p className="text-blue-200/80 text-lg mb-10 max-w-sm mx-auto leading-relaxed relative z-20 font-medium">
-      Your premium AI companion for the ultimate European summer.
-    </p>
-
-    <div className="flex flex-col gap-4 w-full max-w-xs relative z-20">
-      <Button onClick={onStart} className="bg-white text-indigo-900 hover:bg-blue-50">Explore Europe <ArrowRight size={18} /></Button>
-    </div>
-  </div>
-);
+  );
+};
 
 const NavBar: React.FC<{ current: AppView; onChange: (v: AppView) => void }> = ({ current, onChange }) => {
   const items = [
@@ -330,15 +421,31 @@ const CityDetailView: React.FC<{ city: string; onBack: () => void }> = ({ city, 
   const [showBooking, setShowBooking] = useState(false);
   const [bookingTab, setBookingTab] = useState<'attractions' | 'flights' | 'hotels'>('attractions');
   const [selectedAttraction, setSelectedAttraction] = useState<Attraction | null>(null);
+  const [headerImage, setHeaderImage] = useState<string>('');
 
   useEffect(() => {
     let isMounted = true;
+    
+    // Fetch Data
     getLiveCityData(city).then(res => {
       if (isMounted) {
         setData(res);
         setLoading(false);
       }
     });
+
+    // Fetch Image (Try Wiki first, then Fallback)
+    fetchCityImage(city).then(url => {
+        if(isMounted) {
+            if(url) setHeaderImage(url);
+            else {
+                // Fallback to specific nice images if wiki fails
+                const known = POPULAR_CITIES.find(c => c.name === city);
+                setHeaderImage(known ? known.image : "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?q=80&w=800");
+            }
+        }
+    });
+
     return () => { isMounted = false; };
   }, [city]);
 
@@ -378,10 +485,7 @@ const CityDetailView: React.FC<{ city: string; onBack: () => void }> = ({ city, 
       {/* Header Image Area */}
       <div className="relative h-96 w-full">
         <img 
-          src={`https://source.unsplash.com/800x800/?${city},landmark`}
-          onError={(e) => {
-            (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${city}/800/800`
-          }}
+          src={headerImage}
           className="w-full h-full object-cover rounded-b-[3rem] brightness-90 shadow-2xl"
           alt={city} 
         />
@@ -488,20 +592,17 @@ const CityDetailView: React.FC<{ city: string; onBack: () => void }> = ({ city, 
           <SectionTitle>Vibe Check</SectionTitle>
           <div className="grid grid-cols-2 gap-3 h-52 rounded-2xl overflow-hidden shadow-2xl">
              <div className="relative group overflow-hidden">
-                <img src={`https://source.unsplash.com/400x400/?${city},street`} 
-                     onError={(e) => (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${city}street/400/400`}
+                <img src={getCityVibeImage(city, 'street')} 
                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="Street" />
                 <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors"></div>
              </div>
              <div className="grid grid-rows-2 gap-3">
                 <div className="relative group overflow-hidden rounded-tr-2xl">
-                    <img src={`https://source.unsplash.com/400x200/?${city},food`} 
-                         onError={(e) => (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${city}food/400/200`}
+                    <img src={getCityVibeImage(city, 'food')} 
                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="Food" />
                 </div>
                 <div className="relative group overflow-hidden rounded-br-2xl">
-                    <img src={`https://source.unsplash.com/400x200/?${city},night`} 
-                         onError={(e) => (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${city}night/400/200`}
+                    <img src={getCityVibeImage(city, 'night')} 
                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="Night" />
                 </div>
              </div>
@@ -860,6 +961,7 @@ const TRAVEL_VIBES = [
   { title: "Adventure", image: "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?q=80&w=600&auto=format&fit=crop" },
   { title: "Sky High", image: "https://images.unsplash.com/photo-1542296332-2e4426582ad7?q=80&w=600&auto=format&fit=crop" },
   { title: "Coffee & Passport", image: "https://images.unsplash.com/photo-1484807352052-23338990c6c6?q=80&w=600&auto=format&fit=crop" },
+  { title: "Sunset", image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=600&auto=format&fit=crop" },
 ];
 
 const CityCard: React.FC<{ city: typeof POPULAR_CITIES[0]; onSelect: (name: string) => void }> = ({ city, onSelect }) => {
